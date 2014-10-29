@@ -1845,11 +1845,11 @@ class S3SQLInlineComponent(S3SQLSubForm):
     # -------------------------------------------------------------------------
     def __call__(self, field, value, **attributes):
         """
-            Widget method for this form element. Renders a table with
-            read-rows for existing entries, a variable edit-row to update
-            existing entries, and an add-row to add new entries. This widget
-            uses s3.inline_component.js to facilitate manipulation of the
-            entries.
+            Widget method for this form element.
+            Renders a table with read-rows for existing entries, a variable
+            edit-row to update existing entries, and an add-row to add new
+            entries. This widget uses s3.inline_component.js to facilitate
+            manipulation of the entries.
 
             @param field: the Field for this form element
             @param value: the current value for this field
@@ -1865,6 +1865,10 @@ class S3SQLInlineComponent(S3SQLSubForm):
             value = json.dumps(value, separators=SEPARATORS)
         if data is None:
             raise SyntaxError("No resource structure information")
+
+        # Experimental!
+        # - likely to become the default for all themes
+        divs = current.deployment_settings.ui.formstyle == "foundation_2col"
 
         self.upload = Storage()
 
@@ -1889,13 +1893,35 @@ class S3SQLInlineComponent(S3SQLSubForm):
 
         formname = self._formname()
 
-        # Add the header row
-        thead = self._render_headers(data,
-                                     readonly=False,
-                                     _class="label-row")
-
         fields = data["fields"]
         items = data["data"]
+
+        # Add the header row
+        if divs:
+            columns = options.get("columns", None)
+            if not columns:
+                # Automate
+                fields_len = len(fields)
+                if multiple:
+                    total_length = 8 # 12 -2 for label, -2 for controls
+                else:
+                    total_length = 10 # 12 -2 for label
+                field_length = total_length / fields_len
+                used = field_length * fields_len
+                if used == total_length:
+                    columns = [field_length for f in fields]
+                else:
+                    columns = [field_length + 1]
+                    columns += [field_length for f in fields[1:]]
+                self.options.columns = columns
+            thead = self._render_headers_div(data,
+                                             columns,
+                                             readonly=False,
+                                             _class="label-row")
+        else:
+            thead = self._render_headers(data,
+                                         readonly=False,
+                                         _class="label-row")
 
         # Flag whether there are any rows (at least an add-row) in the widget
         has_rows = False
@@ -2038,10 +2064,16 @@ class S3SQLInlineComponent(S3SQLSubForm):
         attr["_id"] = real_input
 
         if has_rows:
+            _class = "embeddedComponent"
+            if divs:
+                TABLE = TBODY = TFOOT = DIV
+                _class = "%s divs" % _class
             widget = TABLE(thead,
-                           TBODY(item_rows),
+                           TBODY(item_rows,
+                                 _class="inline-body",
+                                 ),
                            TFOOT(action_rows),
-                           _class="embeddedComponent",
+                           _class=_class,
                            )
         else:
             widget = current.T("No entries currently available")
@@ -2058,14 +2090,16 @@ class S3SQLInlineComponent(S3SQLSubForm):
             hidden = ""
 
         # Render output HTML
-        output = DIV(INPUT(**attr),
+        widget = DIV(INPUT(**attr),
                      hidden,
                      widget,
                      _id=self._formname(separator="-"),
                      _field=real_input
                      )
+        if self.options.get("collapse"):
+            widget.add_class("collapse")
 
-        return output
+        return widget
 
     # -------------------------------------------------------------------------
     def represent(self, value):
@@ -2114,12 +2148,41 @@ class S3SQLInlineComponent(S3SQLSubForm):
                        _class="embeddedComponent")
 
         else:
+            _class = "embeddedComponent"
 
-            # Render as table with each item in an individual row (+headers)
-            thead = self._render_headers(data,
-                                         readonly=True,
-                                         _class="label-row")
-            trs = []
+            # Experimental!
+            # - likely to become the default for all themes
+            divs = current.deployment_settings.ui.formstyle == "foundation_2col"
+
+            if divs:
+                TABLE = TBODY = TFOOT = TR = DIV
+                _class = "%s divs" % _class
+                columns = self.options.get("columns", None)
+                if not columns:
+                    # Automate
+                    fields_len = len(fields)
+                    if multiple:
+                        total_length = 8 # 12 -2 for label, -2 for controls
+                    else:
+                        total_length = 10 # 12 -2 for label
+                    field_length = total_length / fields_len
+                    used = field_length * fields_len
+                    if used == total_length:
+                        columns = [field_length for f in fields]
+                    else:
+                        columns = [field_length + 1]
+                        columns += [field_length for f in fields[1:]]
+                    self.options.columns = columns
+                thead = self._render_headers_div(data,
+                                                 columns,
+                                                 readonly=True,
+                                                 _class="label-row")
+            else:
+                # Render as table with each item in an individual row (+headers)
+                thead = self._render_headers(data,
+                                             readonly=True,
+                                             _class="label-row")
+            rows = []
             for item in items:
                 if "_id" in item:
                     record_id = item["_id"]
@@ -2131,12 +2194,15 @@ class S3SQLInlineComponent(S3SQLSubForm):
                 for f in fields:
                     text = xml_decode(item[f["name"]]["text"])
                     trow.append(XML(xml_decode(text)))
-                trs.append(trow)
+                rows.append(trow)
 
             return TABLE(thead,
-                         TBODY(trs),
+                         TBODY(rows,
+                               _class="inline-body",
+                               ),
                          TFOOT(),
-                         _class="embeddedComponent")
+                         _class=_class,
+                         )
 
     # -------------------------------------------------------------------------
     def accept(self, form, master_id=None, format=None):
@@ -2352,6 +2418,7 @@ class S3SQLInlineComponent(S3SQLSubForm):
     def _render_headers(self, data, readonly=False, **attributes):
         """
             Render the header row with field labels
+            - TABLE version (currently default)
 
             @param data: the input field data as Python object
             @param readonly: whether the form is read-only
@@ -2380,6 +2447,47 @@ class S3SQLInlineComponent(S3SQLSubForm):
             return THEAD(_class="hide")
 
     # -------------------------------------------------------------------------
+    def _render_headers_div(self, data, columns, readonly=False, **attributes):
+        """
+            Render the header row with field labels
+            - DIV version (currently experimental)
+
+            @param data: the input field data as Python object
+            @param columns: column widths
+            @param readonly: whether the form is read-only
+            @param attributes: HTML attributes for the header row
+        """
+
+        fields = data["fields"]
+        # Don't render a header row if there are no labels
+        render_header = False
+        header_row = DIV(**attributes)
+        happend = header_row.append
+        i = 0
+        for f in fields:
+            label = f["label"]
+            if label:
+                render_header = True
+            col_width = columns[i]
+            if col_width:
+                _class = "columns small-%s" % col_width
+            else:
+                _class = ""
+            label = DIV(LABEL(label),
+                        _class=_class)
+            happend(label)
+            i += 1
+
+        if render_header:
+            if not readonly:
+                # Add columns for the Controls
+                happend(DIV(_class="columns small-1"))
+                happend(DIV(_class="columns small-1"))
+            return DIV(header_row)
+        else:
+            return DIV(_class="hide")
+
+    # -------------------------------------------------------------------------
     def _action_icon(self, title, name, index, throbber=False):
         """
             Render an action icon for one of the form actions
@@ -2396,12 +2504,23 @@ class S3SQLInlineComponent(S3SQLSubForm):
         action = DIV(_id="%s-%s-%s" % (name, formname, index),
                      _class="inline-%s" % name)
 
+        # Experimental!
+        # - likely to become the default for all themes
+        divs = current.deployment_settings.ui.formstyle == "foundation_2col"
+        if divs:
+            _class = "inline-cell small-1 columns"
+        else:
+            _class = "inline-cell"
+
         if throbber:
             return DIV(action,
                        DIV(_class="inline-throbber hide",
-                           _id="throbber-%s-%s" % (formname, index)))
+                           _id="throbber-%s-%s" % (formname, index)),
+                       _class=_class,
+                       )
         else:
-            return DIV(action)
+            return DIV(action, _class=_class)
+            
 
     # -------------------------------------------------------------------------
     def _render_item(self, table, item, fields,
@@ -2428,6 +2547,20 @@ class S3SQLInlineComponent(S3SQLSubForm):
         T = current.T
         s3 = current.response.s3
         settings = s3.crud
+
+        # Experimental!
+        # - likely to become the default for all themes
+        divs = current.deployment_settings.ui.formstyle == "foundation_2col"
+        if divs:
+            i = 0
+            cols = self.options.columns
+            _class = "inline-cell columns"
+            formstyle = self._formstyle_div
+            CELL = DIV
+        else:
+            _class = "inline-cell"
+            formstyle = self._formstyle
+            CELL = TD
 
         columns = []
         rowtype = readonly and "read" or "edit"
@@ -2490,16 +2623,27 @@ class S3SQLInlineComponent(S3SQLSubForm):
         subform = SQLFORM.factory(*formfields,
                                   record=data,
                                   showid=False,
-                                  formstyle=self._formstyle,
+                                  formstyle=formstyle,
                                   upload = s3.download_url,
                                   readonly=readonly,
                                   table_name=subform_name,
                                   submit_button = settings.submit_button)
 
-        for tr in subform[0]:
-            if not tr.attributes["_id"] == "submit_record__row":
-                columns.append(tr[0])
+        for row in subform[0]:
+            if not row.attributes["_id"] == "submit_record__row":
+                if divs:
+                    col_width = cols[i]
+                    if col_width:
+                        __class = "%s small-%s" % (_class, cols[i])
+                    else:
+                        __class = "inline-cell"
+                    columns.append(DIV(row[0], _class=__class))
+                    i += 1
+                else:
+                    columns.append(TD(row[0], _class=_class))
 
+        if divs:
+            _class = "%s small-1" % _class
         if multiple:
             # Render the action icons for this item
             action = self._action_icon
@@ -2509,13 +2653,17 @@ class S3SQLInlineComponent(S3SQLSubForm):
                                  "edt", index)
                     columns.append(edt)
                 else:
-                    columns.append(TD())
+                    columns.append(CELL(_class=_class))
+                if divs:
+                    _class = "%s end" % _class
                 if deletable:
                     rmv = action(T("Remove this entry"),
                                  "rmv", index)
+                    if divs:
+                        rmv.add_class("end")
                     columns.append(rmv)
                 else:
-                    columns.append(TD())
+                    columns.append(CELL(_class=_class))
             else:
                 if index != "none" or item:
                     rdy = action(T("Update this entry"),
@@ -2523,14 +2671,24 @@ class S3SQLInlineComponent(S3SQLSubForm):
                     columns.append(rdy)
                     cnc = action(T("Cancel editing"),
                                  "cnc", index)
+                    if divs:
+                        cnc.add_class("end")
                     columns.append(cnc)
                 else:
-                    columns.append(TD())
+                    columns.append(CELL(_class=_class))
                     add = action(T("Add this entry"),
                                  "add", index, throbber=True)
+                    if divs:
+                        add.add_class("end")
                     columns.append(add)
 
-        return TR(columns, **attributes)
+        if divs:
+            row = DIV(columns, **attributes)
+            if self.options.get("collapse"):
+                row.add_class("collapse")
+            return row
+        else:
+            return TR(columns, **attributes)
 
     # -------------------------------------------------------------------------
     def _filterby_query(self):
@@ -2739,22 +2897,56 @@ class S3SQLInlineComponent(S3SQLSubForm):
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _formstyle(id, label, widget, comment):
+    def _formstyle(form, fields):
         """
             Formstyle for the inline rows
+            - TABLE version (currently default)
 
-            @param id: the HTML element id
-            @param label: the field label
-            @param widget: the widget
-            @param comment: the comment
+            @param form: the SQLFORM
+            @param fields: tuples of (id, label, widget, comment)
         """
 
-        if id == "submit_record__row":
-            return TR(_id=id)
-        elif comment:
-            return TR(DIV(widget, comment), _id=id)
-        else:
-            return TR(widget, _id=id)
+        output = TABLE()
+        oappend = output.append
+        for field in fields:
+            _id, label, widget, comment = field
+            if _id == "submit_record__row":
+                # Will be skipped
+                oappend(TR(_id=_id))
+            elif comment:
+                oappend(TR(DIV(widget, comment), _id=_id))
+            else:
+                oappend(TR(widget, _id=_id))
+
+        return output
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _formstyle_div(form, fields):
+        """
+            Formstyle for the inline rows
+            - DIV version (currently experimental)
+
+            @param form: the SQLFORM
+            @param fields: tuples of (id, label, widget, comment)
+        """
+
+        output = DIV()
+        oappend = output.append
+        for field in fields:
+            _id, label, widget, comment = field
+            if _id == "submit_record__row":
+                # Will be skipped
+                oappend(DIV(_id=_id))
+            else:
+                if isinstance(widget, INPUT):
+                    widget.attributes["_placeholder"] = label
+                if comment:
+                    oappend(DIV(DIV(widget, comment), _id=_id))
+                else:
+                    oappend(DIV(widget, _id=_id))
+
+        return output
 
 # =============================================================================
 class S3SQLInlineLink(S3SQLInlineComponent):
@@ -3554,7 +3746,8 @@ class S3SQLInlineComponentCheckbox(S3SQLInlineComponent):
                                 [[v, ", "] for v in vals]))[:-1])
         return TABLE(TBODY(TR(TD(represent),
                               #_class="read-row"
-                              )),
+                              ),
+                           ),
                      #_class="embeddedComponent"
                      )
 

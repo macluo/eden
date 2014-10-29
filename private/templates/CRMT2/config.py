@@ -1101,6 +1101,7 @@ def customise_org_organisation_controller(**attr):
                                "logo",
                                S3SQLInlineComponent(
                                     "group_membership",
+                                    columns = (4, 2),
                                     label = T("Coalition"),
                                     fields = [("", "group_id"),
                                               ("", "status_id"),
@@ -1132,6 +1133,8 @@ def customise_org_organisation_controller(**attr):
                                "website",
                                S3SQLInlineComponent(
                                     "contact",
+                                    collapse = True,
+                                    columns = (0,),
                                     name = "twitter",
                                     label = T("Twitter"),
                                     multiple = False,

@@ -162,8 +162,14 @@ def formstyle_foundation_2col(form, fields, *args, **kwargs):
             widget_classes = widget_attr.get("_class", "")
             collapse = "collapse" in widget_classes
             if collapse:
-                widget.element().attributes["_class"] = widget_classes.replace("collapse", "")
+                widget.element().attributes["_class"] = \
+                    widget_classes.replace("collapse", "")
             columns = "columns" in widget_classes
+            if not columns:
+                if len(widget) == 3 and \
+                   widget[2].element().attributes.get("_class", ""):
+                    # InlineComponent: columns handled internally
+                    columns = True
             submit = widget.element("input", _type="submit")
             if submit:
                 submit.add_class("small primary button")

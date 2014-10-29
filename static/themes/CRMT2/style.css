@@ -38,11 +38,6 @@ header.row {
     border: 0;
 }
 
-table.embeddedComponent,
-form table.embeddedComponent td {
-    border: none;
-}
-
 .ui-tabs .ui-tabs-nav li {
     border: 0;
     margin: 0;
@@ -183,6 +178,29 @@ table.dataTable .action-btn.read:before {
     position: relative;
     text-align: center;
     text-decoration: none;
+}
+
+/*
+table.embeddedComponent,
+form table.embeddedComponent td {
+    border: none;
+}
+div.embeddedComponent {
+    display: table;
+}
+.add-row,
+.edit-row,
+.empty-row {
+    display: table-row;
+}
+.inline-cell {
+    display: table-cell;
+}*/
+.add-row.collapse  .columns,
+.edit-row.collapse  .columns,
+.empty-row.collapse  .columns {
+    padding-left: 0;
+    padding-right: 0;
 }
 
 /* Moved to CSS in-line with normal Eden practise. Needs more than this to untangle

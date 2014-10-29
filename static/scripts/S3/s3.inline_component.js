@@ -11,7 +11,8 @@ $(function() {
 
     // Mark an inline row as changed
     var inline_mark_changed = function(element) {
-        var subform = $(element).closest('tr.inline-form');
+        //var subform = $(element).closest('tr.inline-form');
+        var subform = $(element).closest('.inline-form');
         $(subform).addClass('changed');
     };
 
@@ -51,12 +52,20 @@ $(function() {
             } else {
                 field_id = '#edit-row-' + formname;
             }
-            var l = $(field_id + '> td').length;
-            msg = '<tr class="' + formname + '_error">' +
-                    '<td colspan="' + l + '">' +
+            var l = $(field_id + '> .inline-cell').length;
+            // Adapt to formstyle
+            if ($('#sub-' + formname + ' > .embeddedComponent').hasClass('divs')) {
+                var td = 'div',
+                    tr = 'div';
+            } else {
+                var td = 'td',
+                    tr = 'tr';
+            }
+            msg = '<' + tr + ' class="' + formname + '_error">' +
+                    '<' + td + ' colspan="' + l + '">' +
                       '<div class="error">' +
                         message +
-                      '</div></td></tr>';
+                      '</div></' + td + '></' + tr + '>';
         } else {
             field_id = '#sub_' + formname + '_' + formname + '_i_' + fieldname + '_edit_' + rowindex;
             msg = '<div class="' + formname + '_error error">' + message + '</div>';
@@ -81,16 +90,18 @@ $(function() {
 
     // Disable the add-row
     var disable_inline_add = function(formname) {
-        var add_tds = $('#add-row-' + formname + ' > td');
-        add_tds.find('input, select, textarea').prop('disabled', true);
-        add_tds.find('.inline-add, .action-lnk').addClass('hide');
+        //var add_cells = $('#add-row-' + formname + ' > td');
+        var add_cells = $('#add-row-' + formname + ' > .inline-cell');
+        add_cells.find('input, select, textarea').prop('disabled', true);
+        add_cells.find('.inline-add, .action-lnk').addClass('hide');
     };
 
     // Enable the add-row
     var enable_inline_add = function(formname) {
-        var add_tds = $('#add-row-' + formname + ' > td');
-        add_tds.find('input, select, textarea').prop('disabled', false);
-        add_tds.find('.inline-add, .action-lnk').removeClass('hide');
+        //var add_cells = $('#add-row-' + formname + ' > td');
+        var add_cells = $('#add-row-' + formname + ' > .inline-cell');
+        add_cells.find('input, select, textarea').prop('disabled', false);
+        add_cells.find('.inline-add, .action-lnk').removeClass('hide');
     };
 
     // Collect the data from the form
@@ -391,8 +402,8 @@ $(function() {
             if (!input.length) {
                 // Read-only field
                 text = row[fieldname]['text'];
-                var td = $('#edit-row-' + formname + ' td')[i];
-                td.innerHTML = text;
+                var cell = $('#edit-row-' + formname + ' .inline-cell')[i];
+                cell.innerHTML = text;
             } else {
                 if (input.attr('type') == 'file') {
                     // Update the existing upload item, if there is one
@@ -519,8 +530,17 @@ $(function() {
             inline_serialize(formname, data);
 
             if (multiple) {
+                // Adapt to formstyle
+                if ($('#sub-' + formname + ' > .embeddedComponent').hasClass('divs')) {
+                    var td = 'div',
+                        tr = 'div';
+                } else {
+                    var td = 'td',
+                        tr = 'tr';
+                }
+
                 // Create a new read-row, clear add-row
-                var read_row = '<tr id="read-row-' + formname + '-' + newindex + '" class="read-row">';
+                var read_row = '<' + tr +' id="read-row-' + formname + '-' + newindex + '" class="read-row">';
                 var fields = data['fields'];
                 var i, field, upload, d, f, default_value;
                 for (i=0; i < fields.length; i++) {
@@ -533,7 +553,7 @@ $(function() {
                         upload.attr('id', upload_id)
                               .attr('name', upload_id);
                     }
-                    read_row += '<td>' + new_row[field]['text'] + '</td>';
+                    read_row += '<' + td + ' _class="inline-cell">' + new_row[field]['text'] + '</' + td + '>';
                     // Reset add-field to default value
                     d = $('#sub_' + formname + '_' + formname + '_i_' + field + '_edit_default');
                     f = $('#sub_' + formname + '_' + formname + '_i_' + field + '_edit_none');
@@ -562,19 +582,20 @@ $(function() {
                 
                 // Add edit-button
                 if ($('#edt-' + formname + '-none').length !== 0) {
-                    read_row += '<td><div><div id="edt-' + formname + '-' + newindex + '" class="inline-edt"></div></div></td>';
+                    read_row += '<' + td + ' _class="inline-cell"><div><div id="edt-' + formname + '-' + newindex + '" class="inline-edt"></div></div></' + td + '>';
                 } else {
-                    read_row += '<td></td>';
+                    read_row += '<' + td + ' _class="inline-cell"></' + td + '>';
                 }
                 // Add remove-button
                 if ($('#rmv-' + formname + '-none').length !== 0) {
-                    read_row += '<td><div><div id="rmv-' + formname + '-' + newindex + '" class="inline-rmv"></div></div></td>';
+                    read_row += '<' + td + ' _class="inline-cell"><div><div id="rmv-' + formname + '-' + newindex + '" class="inline-rmv"></div></div></' + td + '>';
                 } else {
-                    read_row += '<td></td>';
+                    read_row += '<' + td + ' _class="inline-cell"></' + td + '>';
                 }
-                read_row += '</tr>';
+                read_row += '</' + tr + '>';
                 // Append the new read-row to the table
-                $('#sub-' + formname + ' > table.embeddedComponent > tbody').append(read_row);
+                //$('#sub-' + formname + ' > table.embeddedComponent > tbody').append(read_row);
+                $('#sub-' + formname + ' > .embeddedComponent > .inline-body').append(read_row);
                 inline_button_events();
             }
         }
@@ -642,9 +663,15 @@ $(function() {
                         fields = data['fields'],
                         default_value,
                         i;
+                    // Adapt to formstyle
+                    if ($('#sub-' + formname + ' > .embeddedComponent').hasClass('divs')) {
+                        var td = 'div';
+                    } else {
+                        var td = 'td';
+                    }
                     for (i=0; i < fields.length; i++) {
                         var field = fields[i]['name'];
-                        read_row += '<td>' + new_row[field]['text'] + '</td>';
+                        read_row += '<' + td + ' _class="inline-cell">' + new_row[field]['text'] + '</' + td + '>';
                         // Reset edit-field to default value
                         var d = $('#sub_' + formname + '_' + formname + '_i_' + field + '_edit_default');
                         var f = $('#sub_' + formname + '_' + formname + '_i_' + field + '_edit_0');
@@ -671,18 +698,18 @@ $(function() {
                     
                     // Add edit-button
                     if ($('#edt-' + formname + '-none').length !== 0) {
-                        read_row += '<td><div><div id="edt-' + formname + '-' + rowindex + '" class="inline-edt"></div></div></td>';
+                        read_row += '<' + td + ' _class="inline-cell"><div><div id="edt-' + formname + '-' + rowindex + '" class="inline-edt"></div></div></' + td + '>';
                     } else {
-                        read_row += '<td></td>';
+                        read_row += '<' + td + ' _class="inline-cell"></' + td + '>';
                     }
                     // Add remove-button
                     if ($('#rmv-' + formname + '-none').length !== 0) {
-                        read_row += '<td><div><div id="rmv-' + formname + '-' + rowindex + '" class="inline-rmv"></div></div></td>';
+                        read_row += '<' + td + ' _class="inline-cell"><div><div id="rmv-' + formname + '-' + rowindex + '" class="inline-rmv"></div></div></' + td + '>';
                     } else {
-                        read_row += '<td></td>';
+                        read_row += '<' + td + ' _class="inline-cell"></' + td + '>';
                     }
 
-                    $('#read-row-' + formname + '-' + rowindex + ' > td').remove();
+                    $('#read-row-' + formname + '-' + rowindex + ' >  .inline-cell').remove();
                     $('#read-row-' + formname + '-' + rowindex).html(read_row);
                     inline_button_events();
 
@@ -752,7 +779,8 @@ $(function() {
             _success,
             success = true;
 
-        var changed = $form.find('tr.inline-form.changed, tr.inline-form.required');
+        //var changed = $form.find('tr.inline-form.changed, tr.inline-form.required');
+        var changed = $form.find('.inline-form.changed, .inline-form.required');
         if (changed.length) {
             changed.each(function() {
                 var $this = $(this);
